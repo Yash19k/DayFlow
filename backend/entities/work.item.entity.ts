@@ -24,11 +24,15 @@ export enum WorkItemType {
 }
 
 export enum WorkItemStatus {
-  TODO = "TODO",
+  BACKLOG = "BACKLOG",
   IN_PROGRESS = "IN_PROGRESS",
   IN_REVIEW = "IN_REVIEW",
+  TESTING_QA = "TESTING_QA",
+  BLOCKED = "BLOCKED",
+  ON_HOLD = "ON_HOLD",
   DONE = "DONE",
 }
+
 
 export enum WorkItemPriority {
   LOW = "LOW",
@@ -77,13 +81,13 @@ export class WorkItem {
   @Column({ type: "text", nullable: true })
   description: string | null;
 
-  @Column({
-    type: "enum",
-    enum: WorkItemStatus,
-    enumName: "work_items_status_enum",
-    default: WorkItemStatus.TODO,
-  })
-  status: WorkItemStatus;
+ @Column({
+  type: "enum",
+  enum: WorkItemStatus,
+  enumName: "work_items_status_enum",
+  default: WorkItemStatus.BACKLOG,
+})
+status: WorkItemStatus;
 
   @Column({
     type: "enum",

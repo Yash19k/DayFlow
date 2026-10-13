@@ -67,10 +67,10 @@ export const isLoggedIn = async (
       role:decoded.role,
     };
 
-    // 7. Continue to the next middleware or controller
+    
     next();
   } catch (error: unknown) {
-    // Invalid, expired, or malformed JWT
+  
     if (
       error instanceof jwt.JsonWebTokenError ||
       error instanceof jwt.TokenExpiredError
