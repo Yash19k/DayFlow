@@ -75,15 +75,15 @@ export const isLoggedIn = async (
       return;
     }
 
-    // 6. Attach the authenticated identity to the request
     req.user = {
       id: user.id,
+      role:user.role
     };
 
-    // 7. Continue to the next middleware or controller
+    
     next();
   } catch (error: unknown) {
-    // Invalid, expired, or malformed JWT
+  
     if (
       error instanceof jwt.JsonWebTokenError ||
       error instanceof jwt.TokenExpiredError
