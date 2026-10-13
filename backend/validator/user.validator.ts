@@ -2,14 +2,14 @@ import Joi from "joi";
 // const Joi = require("joi");
 
 // 1. Define the schema for Full Name, Email, and Password
-const signupSchema = Joi.object({
+export const signupSchema = Joi.object({
   fullName: Joi.string().min(3).max(50).trim().required().messages({
     "string.empty": "Full name is required",
     "string.min": "Full name must be at least 3 characters long",
   }),
 
   email: Joi.string()
-    .email({ tlds: { allow: false } }) // Validates email format
+    .email({ tlds: { allow: false } })
     .lowercase()
     .trim()
     .required()

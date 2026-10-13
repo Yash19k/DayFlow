@@ -1,6 +1,7 @@
 {
   "name": "taskflow",
   "version": "1.0.0",
+  "packageManager": "pnpm@10.34.7",
   "description": "",
   "type": "commonjs",
   "main": "server.ts",
