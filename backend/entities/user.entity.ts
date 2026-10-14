@@ -33,7 +33,7 @@ export enum UserStatus {
 
 @Entity({ name: "users" })
 @Index("IDX_users_organization_id", ["organizationId"])
-export class User extends BaseEntity {
+export class User  {
   @PrimaryGeneratedColumn("uuid")
   id: string;
 
