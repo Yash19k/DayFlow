@@ -23,3 +23,23 @@ export const signupSchema = Joi.object({
     "string.empty": "Password is required",
   }),
 });
+
+
+
+export const onboardingSchema = Joi.object({
+  user: Joi.object({
+    fullName: Joi.string().trim().min(2).max(100).required(),
+    email: Joi.string().trim().lowercase().email().max(255).required(),
+    password: Joi.string().min(8).max(72).required(), // bcrypt only uses the first 72 bytes
+  }).required(),
+
+  organization: Joi.object({
+    name: Joi.string().trim().min(2).max(150).required(),
+    slug: Joi.string()
+      .trim()
+      .lowercase()
+      .min(3)
+      .max(100)
+      .required(),
+  }).required(),
+});

@@ -32,7 +32,7 @@ export enum UserStatus {
 
 @Entity({ name: "users" })
 @Index("IDX_users_organization_id", ["organizationId"])
-export class User extends BaseEntity {
+export class User  {
   @PrimaryGeneratedColumn("uuid")
   id: string;
 
@@ -71,7 +71,7 @@ export class User extends BaseEntity {
   updatedAt: Date;
 
   @ManyToOne(() => Organization, (organization) => organization.users, {
-    nullable: false,
+    nullable: true,
     onDelete: "RESTRICT",
   })
   @JoinColumn({ name: "organization_id" })
