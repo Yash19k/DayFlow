@@ -1,14 +1,14 @@
-import express, { type Express } from "express";
-import { type Request, type Response, type NextFunction } from "express";
-import { signupSchema } from "../validator/user.validator";
-const Router = express.Router();
+import { Router, Request, Response, NextFunction } from "express";
+import bcrypt from "bcrypt";
+import { AppDataSource } from "../config/data.source";
+import { User, UserRole, UserStatus } from "../entities/user.entity";
+import { signupSchema } from "../validations/user.validator";
+import { userSignUp } from "../controllers/user.controller";
+import { isLoggedIn } from "../middleware/is.loggedin";
 
-Router.post("/auth", async (req: Request, res: Response, next: NextFunction) => {
-    
-    const value = signupSchema.validate(req.body);
-    console.log(value);
-    res.send("done");
-})
+const router = Router();
+const userRepository = AppDataSource.getRepository(User);
 
+router.post("/auth", userSignUp);
 
-export default Router;
+export default router;
