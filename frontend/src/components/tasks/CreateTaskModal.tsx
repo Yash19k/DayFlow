@@ -1,0 +1,543 @@
+import React, { useState, useMemo } from 'react';
+import { Dialog } from '../ui/Dialog';
+import { Input, Textarea, Select } from '../ui/Input';
+import { Button } from '../ui/Button';
+import { useApp } from '../../hooks/useApp';
+import {
+  WORK_ITEM_TYPES,
+  WORK_ITEM_TYPE_LIST,
+  BUG_SEVERITIES,
+} from '../../domain/workItems';
+import { getEligibleParents } from '../../domain/hierarchy';
+import { formatRecurrenceRule } from '../../domain/recurrence';
+import { WorkItemType, Priority, BugSeverity, TaskAttachment } from '../../types';
+import { TaskAttachments } from './TaskAttachments';
+import { Repeat } from 'lucide-react';
+
+export interface CreateTaskModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  initialDueDate?: string;
+  initialStartDate?: string;
+}
+
+export function CreateTaskModal({
+  isOpen,
+  onClose,
+  initialDueDate,
+  initialStartDate,
+}: CreateTaskModalProps) {
+  const { createTask, currentProject, allUsers, currentWorkflow, tasks } = useApp();
+
+  // Core Common Fields - default to unassigned, no priority, empty dates and hours
+  const [type, setType] = useState<WorkItemType>(WORK_ITEM_TYPES.TASK);
+  const [parentId, setParentId] = useState('');
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [sectionId, setSectionId] = useState(currentProject?.sections?.[0]?.id || 'sec-1');
+  const [status, setStatus] = useState('Backlog');
+  const [priority, setPriority] = useState<Priority | ''>('');
+  const [assigneeId, setAssigneeId] = useState('');
+  const [startDate, setStartDate] = useState(initialStartDate || '');
+  const [dueDate, setDueDate] = useState(initialDueDate || '');
+  const [estimateHours, setEstimateHours] = useState<number | string>('');
+  const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
+
+  // Recurrence configuration
+  const [recFrequency, setRecFrequency] = useState('none');
+  const [recInterval, setRecInterval] = useState<number | string>(1);
+  const [recWeekdaysOnly, setRecWeekdaysOnly] = useState(false);
+
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen);
+    if (isOpen) {
+      if (initialDueDate !== undefined) setDueDate(initialDueDate);
+      if (initialStartDate !== undefined) setStartDate(initialStartDate);
+    }
+  }
+
+  // Epic-specific fields
+  const [businessGoal, setBusinessGoal] = useState('');
+  const [successCriteria, setSuccessCriteria] = useState('');
+
+  // Story-specific fields
+  const [acceptanceCriteria, setAcceptanceCriteria] = useState('');
+
+  // Bug-specific fields
+  const [severity, setSeverity] = useState<BugSeverity>('Medium');
+  const [stepsToReproduce, setStepsToReproduce] = useState('');
+  const [expectedBehavior, setExpectedBehavior] = useState('');
+  const [actualBehavior, setActualBehavior] = useState('');
+  const [environment, setEnvironment] = useState('');
+
+  // Field validation errors
+  const [errors, setErrors] = useState<Record<string, string | undefined>>({});
+
+  // Compute eligible parent items for the selected type
+  const eligibleParents = useMemo(() => {
+    return getEligibleParents(type, null, tasks, currentProject?.id);
+  }, [type, tasks, currentProject?.id]);
+
+  function handleTypeChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const newType = e.target.value as WorkItemType;
+    setType(newType);
+    setParentId(''); // reset parent when type changes to prevent stale mismatch
+    setErrors({});
+  }
+
+  function validateForm() {
+    const errs: Record<string, string> = {};
+    if (!title.trim()) {
+      errs.title = 'Title is required';
+    }
+
+    if (type === WORK_ITEM_TYPES.SUBTASK) {
+      if (!parentId) {
+        errs.parentId = 'A parent work item (Story, Task, or Bug) is required for Subtasks.';
+      }
+    }
+
+    if (type === WORK_ITEM_BUG_CHECK(type)) {
+      if (!severity) {
+        errs.severity = 'Severity is required for Bugs.';
+      }
+      if (!stepsToReproduce.trim()) {
+        errs.stepsToReproduce = 'Steps to reproduce are required for Bugs.';
+      }
+    }
+
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  }
+
+  function WORK_ITEM_BUG_CHECK(itemType: WorkItemType) {
+    return itemType === WORK_ITEM_TYPES.BUG ? WORK_ITEM_TYPES.BUG : '';
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!validateForm()) return;
+
+    const payload: Record<string, any> = {
+      type,
+      parentId: parentId || null,
+      title: title.trim(),
+      description,
+      projectId: currentProject?.id,
+      sectionId,
+      status,
+      priority: priority || null,
+      assigneeId: assigneeId || null,
+      startDate: startDate || null,
+      dueDate: dueDate || null,
+      estimateHours: estimateHours !== '' ? Number(estimateHours) : null,
+      attachments,
+      recurrenceRule:
+        recFrequency !== 'none'
+          ? {
+              frequency: recFrequency,
+              interval: Number(recInterval) || 1,
+              weekdaysOnly: recWeekdaysOnly,
+              endCondition: 'never',
+            }
+          : { frequency: 'none' },
+    };
+
+    if (type === WORK_ITEM_TYPES.EPIC) {
+      payload.businessGoal = businessGoal;
+      payload.successCriteria = successCriteria;
+    } else if (type === WORK_ITEM_TYPES.STORY) {
+      payload.acceptanceCriteria = acceptanceCriteria;
+    } else if (type === WORK_ITEM_TYPES.BUG) {
+      payload.severity = severity;
+      payload.stepsToReproduce = stepsToReproduce;
+      payload.expectedBehavior = expectedBehavior;
+      payload.actualBehavior = actualBehavior;
+      payload.environment = environment;
+    }
+
+    const res = createTask(payload);
+    if (res?.success) {
+      resetForm();
+      onClose();
+    } else if (res?.reason) {
+      setErrors((prev) => ({ ...prev, general: res.reason }));
+    }
+  }
+
+  function resetForm() {
+    setType(WORK_ITEM_TYPES.TASK);
+    setParentId('');
+    setTitle('');
+    setDescription('');
+    setStatus('Backlog');
+    setPriority('');
+    setAssigneeId('');
+    setStartDate(initialStartDate || '');
+    setDueDate(initialDueDate || '');
+    setRecFrequency('none');
+    setRecInterval(1);
+    setRecWeekdaysOnly(false);
+    setEstimateHours('');
+    setAttachments([]);
+    setBusinessGoal('');
+    setSuccessCriteria('');
+    setAcceptanceCriteria('');
+    setSeverity('Medium');
+    setStepsToReproduce('');
+    setExpectedBehavior('');
+    setActualBehavior('');
+    setEnvironment('');
+    setErrors({});
+  }
+
+  return (
+    <Dialog
+      isOpen={isOpen}
+      onClose={() => {
+        resetForm();
+        onClose();
+      }}
+      title="Create New Work Item"
+      description={`Creating item in ${currentProject?.name || 'Project'}`}
+      maxWidth="max-w-xl"
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {errors.general && (
+          <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-xs text-rose-300">
+            {errors.general}
+          </div>
+        )}
+
+        {/* Work Item Type Selector */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Select
+            label="Work Item Type *"
+            value={type}
+            onChange={handleTypeChange}
+          >
+            {WORK_ITEM_TYPE_LIST.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </Select>
+
+          {/* Type-Aware Parent Selector */}
+          {type !== WORK_ITEM_TYPES.EPIC && (
+            <Select
+              label={
+                type === WORK_ITEM_TYPES.SUBTASK
+                  ? 'Parent Work Item *'
+                  : 'Parent Epic (Optional)'
+              }
+              value={parentId}
+              onChange={(e) => {
+                setParentId(e.target.value);
+                if (errors.parentId) setErrors((prev) => ({ ...prev, parentId: '' }));
+              }}
+              error={errors.parentId}
+            >
+              <option value="">
+                {type === WORK_ITEM_TYPES.SUBTASK
+                  ? '-- Select Parent (Story, Task, or Bug) --'
+                  : '-- None (Standalone) --'}
+              </option>
+              {eligibleParents.map((p) => (
+                <option key={p.id} value={p.id}>
+                  [{p.type || 'Task'}] {p.title}
+                </option>
+              ))}
+            </Select>
+          )}
+        </div>
+
+        {/* Title */}
+        <Input
+          label="Title *"
+          placeholder="What needs to be accomplished?"
+          value={title}
+          onChange={(e) => {
+            setTitle(e.target.value);
+            if (errors.title) setErrors((prev) => ({ ...prev, title: '' }));
+          }}
+          error={errors.title}
+          autoFocus
+        />
+
+        {/* Description */}
+        <Textarea
+          label="Description"
+          placeholder="Add context, specifications, background..."
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={2}
+        />
+
+        {/* --- TYPE-SPECIFIC DYNAMIC FIELDS --- */}
+
+        {/* 1. Epic Fields */}
+        {type === WORK_ITEM_TYPES.EPIC && (
+          <div className="p-3.5 rounded-xl bg-surface-elevated/60 border border-border space-y-3">
+            <h4 className="text-xs font-semibold text-text-primary uppercase tracking-wider">
+              Epic Specifications
+            </h4>
+            <Input
+              label="Business Goal"
+              placeholder="Strategic outcome or business value..."
+              value={businessGoal}
+              onChange={(e) => setBusinessGoal(e.target.value)}
+            />
+            <Textarea
+              label="Success Criteria"
+              placeholder="Measurable KPIs or acceptance definition..."
+              value={successCriteria}
+              onChange={(e) => setSuccessCriteria(e.target.value)}
+              rows={2}
+            />
+          </div>
+        )}
+
+        {/* 2. Story Fields */}
+        {type === WORK_ITEM_TYPES.STORY && (
+          <div className="p-3.5 rounded-xl bg-surface-elevated/60 border border-border space-y-3">
+            <h4 className="text-xs font-semibold text-text-primary uppercase tracking-wider">
+              Story Acceptance
+            </h4>
+            <Textarea
+              label="Acceptance Criteria"
+              placeholder="Given... When... Then... criteria"
+              value={acceptanceCriteria}
+              onChange={(e) => setAcceptanceCriteria(e.target.value)}
+              rows={2}
+            />
+          </div>
+        )}
+
+        {/* 3. Bug Fields */}
+        {type === WORK_ITEM_TYPES.BUG && (
+          <div className="p-3.5 rounded-xl bg-surface-elevated/60 border border-border space-y-3">
+            <h4 className="text-xs font-semibold text-rose-400 uppercase tracking-wider">
+              Bug Report Details
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Select
+                label="Severity *"
+                value={severity}
+                onChange={(e) => {
+                  setSeverity(e.target.value as BugSeverity);
+                  if (errors.severity) setErrors((prev) => ({ ...prev, severity: '' }));
+                }}
+                error={errors.severity}
+              >
+                {BUG_SEVERITIES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </Select>
+              <Input
+                label="Environment"
+                placeholder="e.g. Chrome 129, macOS 15, Staging"
+                value={environment}
+                onChange={(e) => setEnvironment(e.target.value)}
+              />
+            </div>
+            <Textarea
+              label="Steps to Reproduce *"
+              placeholder="1. Go to...\n2. Click on...\n3. Observe error..."
+              value={stepsToReproduce}
+              onChange={(e) => {
+                setStepsToReproduce(e.target.value);
+                if (errors.stepsToReproduce) setErrors((prev) => ({ ...prev, stepsToReproduce: '' }));
+              }}
+              rows={3}
+              error={errors.stepsToReproduce}
+            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Textarea
+                label="Expected Behavior"
+                placeholder="What should have occurred..."
+                value={expectedBehavior}
+                onChange={(e) => setExpectedBehavior(e.target.value)}
+                rows={2}
+              />
+              <Textarea
+                label="Actual Behavior"
+                placeholder="What unexpectedly happened..."
+                value={actualBehavior}
+                onChange={(e) => setActualBehavior(e.target.value)}
+                rows={2}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Section & Assignee */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Select
+            label="Section"
+            value={sectionId}
+            onChange={(e) => setSectionId(e.target.value)}
+          >
+            {currentProject?.sections?.map((sec) => (
+              <option key={sec.id} value={sec.id}>
+                {sec.name}
+              </option>
+            ))}
+          </Select>
+
+          <Select
+            label="Assignee"
+            value={assigneeId}
+            onChange={(e) => setAssigneeId(e.target.value)}
+          >
+            <option value="">-- No assignee (Unassigned) --</option>
+            {allUsers.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name} ({u.role})
+              </option>
+            ))}
+          </Select>
+        </div>
+
+        {/* Status, Priority, Start Date, Due Date */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+          <Select
+            label="Initial Status"
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+          >
+            {currentWorkflow?.statuses?.map((st) => (
+              <option key={st.id} value={st.name}>
+                {st.name}
+              </option>
+            )) || <option value="Backlog">Backlog</option>}
+          </Select>
+
+          <Select
+            label="Priority"
+            value={priority}
+            onChange={(e) => setPriority(e.target.value as Priority | '')}
+          >
+            <option value="">No priority</option>
+            <option value="High">High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
+          </Select>
+
+          <Input
+            label="Start Date"
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+          />
+
+          <Input
+            label="Due Date"
+            type="date"
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
+          />
+        </div>
+
+        {/* Recurrence Configuration */}
+        <div className="p-3.5 rounded-xl bg-surface-elevated/40 border border-border space-y-3">
+          <div className="flex items-center gap-2">
+            <Repeat size={14} className="text-brand-primary" />
+            <h4 className="text-xs font-semibold text-text-primary uppercase tracking-wider">
+              Recurrence Schedule
+            </h4>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Select
+              label="Frequency"
+              value={recFrequency}
+              onChange={(e) => setRecFrequency(e.target.value)}
+            >
+              <option value="none">Does not repeat (One-time)</option>
+              <option value="daily">Daily</option>
+              <option value="weekly_monday">Weekly on Monday</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly_first_day">Monthly on the 1st day</option>
+              <option value="monthly_last_friday">Monthly on the last Friday</option>
+              <option value="monthly">Monthly (same day of month)</option>
+            </Select>
+
+            {(recFrequency === 'daily' || recFrequency === 'weekly' || recFrequency === 'monthly') && !recWeekdaysOnly && (
+              <Input
+                label={`Repeat Interval (${recFrequency === 'daily' ? 'days' : recFrequency === 'weekly' ? 'weeks' : 'months'})`}
+                type="number"
+                min="1"
+                max="30"
+                value={recInterval}
+                onChange={(e) => setRecInterval(e.target.value)}
+              />
+            )}
+          </div>
+
+          {recFrequency === 'daily' && (
+            <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer">
+              <input
+                type="checkbox"
+                checked={recWeekdaysOnly}
+                onChange={(e) => setRecWeekdaysOnly(e.target.checked)}
+                className="w-3.5 h-3.5 rounded border-border text-brand-primary"
+              />
+              <span>Weekdays only (skip Saturday & Sunday)</span>
+            </label>
+          )}
+
+          {recFrequency !== 'none' && (
+            <div className="p-2.5 rounded-lg bg-surface border border-border/80 flex items-center justify-between text-xs">
+              <span className="text-text-muted">Rule:</span>
+              <span className="font-semibold text-brand-primary">
+                {formatRecurrenceRule({
+                  frequency: recFrequency,
+                  interval: Number(recInterval) || 1,
+                  weekdaysOnly: recWeekdaysOnly,
+                })}
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div>
+          <Input
+            label="Estimated Working Hours"
+            type="number"
+            min="0"
+            step="0.5"
+            placeholder="e.g. 4 (optional)"
+            value={estimateHours}
+            onChange={(e) => setEstimateHours(e.target.value)}
+          />
+        </div>
+
+        {/* Image and Video Attachments */}
+        <TaskAttachments
+          attachments={attachments}
+          onChange={setAttachments}
+        />
+
+        <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              resetForm();
+              onClose();
+            }}
+          >
+            Cancel
+          </Button>
+          <Button variant="primary" size="sm" type="submit">
+            Create {type}
+          </Button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
