@@ -8,6 +8,7 @@ import {
   OneToMany,
   JoinColumn,
   Index,
+  BaseEntity,
 } from "typeorm";
 
 import { Organization } from "./organization.entity";
@@ -31,7 +32,7 @@ export enum UserStatus {
 
 @Entity({ name: "users" })
 @Index("IDX_users_organization_id", ["organizationId"])
-export class User {
+export class User extends BaseEntity {
   @PrimaryGeneratedColumn("uuid")
   id: string;
 

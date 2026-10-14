@@ -1,8 +1,8 @@
 {
   "name": "taskflow",
   "version": "1.0.0",
-  "description": "",
   "packageManager": "pnpm@10.34.7",
+  "description": "",
   "type": "commonjs",
   "main": "server.ts",
   "scripts": {
@@ -23,6 +23,7 @@
     "typeorm": "^1.1.2"
   },
   "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^26.6.5",

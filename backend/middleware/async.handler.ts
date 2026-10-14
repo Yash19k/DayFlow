@@ -12,9 +12,7 @@ type AsyncController = (
   next: NextFunction,
 ) => Promise<unknown>;
 
-export function asyncHandler(
-  controller: AsyncController,
-): RequestHandler {
+export function asyncHandler(controller: AsyncController,): RequestHandler {
   return (req, res, next) => {
     Promise.resolve(controller(req, res, next)).catch(next);
   };

@@ -41,9 +41,7 @@ export const isLoggedIn = async (
     }
 
     // 3. Verify the JWT signature and expiration
-    const decoded = jwt.verify(token, secret, {
-      algorithms: ["HS256"],
-    });
+    const decoded = jwt.verify(token, secret);
 
     // 4. Validate the payload structure
     if (
@@ -63,21 +61,10 @@ export const isLoggedIn = async (
     // 5. Find the user in the database
     const userRepository = AppDataSource.getRepository(User);
 
-    const user = await userRepository.findOneBy({
-      id: payload.userId,
-    });
-
-    if (!user) {
-      res.status(401).json({
-        success: false,
-        message: "User account not found. Please log in again.",
-      });
-      return;
-    }
-
+    // 6. Attach the authenticated identity to the request
     req.user = {
-      id: user.id,
-      role:user.role
+      id: decoded.id,
+      role:decoded.role,
     };
 
     

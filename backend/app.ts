@@ -1,12 +1,15 @@
 
 import express from "express";
+import userRoutes from "./routes/user.routes";
 
 export const app = express();
 
 console.log("App.ts executed");
 
 app.use(express.json());
-app.use(express.urlencoded({extended:true}))
+app.use(express.urlencoded({ extended: true }));
+app.use("/api/v1", userRoutes);
+
 app.get("/", (_req, res) => {
   res.json({
     success: true,
