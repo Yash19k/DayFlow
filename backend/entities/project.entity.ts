@@ -16,6 +16,7 @@ import { Organization } from "./organization.entity";
 import { User } from "./user.entity";
 import { WorkItem } from "./work.item.entity";
 import { ProjectMember } from "./project.member.entity";
+import { Sprint } from "./sprint.entities";
 export enum ProjectVisibility {
   PRIVATE = "PRIVATE",
   PUBLIC = "PUBLIC",
@@ -108,4 +109,9 @@ export class Project {
   default: ProjectVisibility.PRIVATE,
 })
 visibility: ProjectVisibility;
+@OneToMany(
+  () => Sprint,
+  (sprint) => sprint.project,
+)
+sprints: Sprint[];
 }

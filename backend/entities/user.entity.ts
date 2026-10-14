@@ -17,6 +17,7 @@ import { WorkItem } from "./work.item.entity";
 import { WorkItemAssignee } from "./work.item-assignee.entity"
 import { ProjectMember } from "./project.member.entity";
 import { UserSession } from "./user.session.entity";
+import { Sprint } from "./sprint.entities";
 
 export enum UserRole {
   ADMIN = "ADMIN",
@@ -98,4 +99,9 @@ export class User extends BaseEntity {
 projectMemberships!: ProjectMember[];
 @OneToMany(() => UserSession, (session) => session.user)
 sessions!: UserSession[];
+@OneToMany(
+  () => Sprint,
+  (sprint) => sprint.createdBy,
+)
+createdSprints: Sprint[];
 }

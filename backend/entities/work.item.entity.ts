@@ -13,6 +13,7 @@ import {
 import { Project } from "./project.entity";
 import { User } from "./user.entity";
 import { WorkItemAssignee } from "./work.item-assignee.entity";
+import { Sprint } from "./sprint.entities";
 
 
 export enum WorkItemType {
@@ -141,4 +142,21 @@ status: WorkItemStatus;
     (assignment) => assignment.workItem,
   )
   assignments: WorkItemAssignee[];
+  @Column({
+  name: "sprint_id",
+  type: "uuid",
+  nullable: true,
+})
+sprintId: string | null;
+
+@ManyToOne(
+  () => Sprint,
+  (sprint) => sprint.workItems,
+  {
+    nullable: true,
+    onDelete: "SET NULL",
+  },
+)
+@JoinColumn({ name: "sprint_id" })
+sprint: Sprint | null;
 }
