@@ -12,6 +12,8 @@ import {
   mockNotifications,
   mockAuditLog,
   defaultCompany,
+  mockSprints,
+  mockLabels,
 } from '../data/seedData';
 import {
   User,
@@ -22,6 +24,8 @@ import {
   Notification,
   AuditLogEntry,
   Company,
+  Sprint,
+  Label,
 } from '../types';
 
 export const STORAGE_KEYS = {
@@ -32,6 +36,8 @@ export const STORAGE_KEYS = {
   NOTIFICATIONS: 'taskflow_notifications_v2',
   AUDIT_LOG: 'taskflow_audit_log_v2',
   COMPANY: 'taskflow_company_v2',
+  SPRINTS: 'taskflow_sprints_v2',
+  LABELS: 'taskflow_labels_v2',
 } as const;
 
 export type StorageKeyName = keyof typeof STORAGE_KEYS;
@@ -222,6 +228,8 @@ export interface InitialAppState {
   workflows: Workflow[];
   notifications: Notification[];
   auditLog: AuditLogEntry[];
+  sprints: Sprint[];
+  labels: Label[];
 }
 
 export function loadInitialState(): InitialAppState {
@@ -233,10 +241,14 @@ export function loadInitialState(): InitialAppState {
     const savedWorkflows = localStorage.getItem(STORAGE_KEYS.WORKFLOWS);
     const savedNotifications = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
     const savedAuditLog = localStorage.getItem(STORAGE_KEYS.AUDIT_LOG);
+    const savedSprints = localStorage.getItem(STORAGE_KEYS.SPRINTS);
+    const savedLabels = localStorage.getItem(STORAGE_KEYS.LABELS);
 
     const initialProjects = savedProjects ? JSON.parse(savedProjects) : mockProjects;
     const initialTasks = savedTasks ? JSON.parse(savedTasks) : mockTasks;
     const initialWorkflows = savedWorkflows ? JSON.parse(savedWorkflows) : mockWorkflows;
+    const initialSprints = savedSprints ? JSON.parse(savedSprints) : mockSprints;
+    const initialLabels = savedLabels ? JSON.parse(savedLabels) : mockLabels;
 
     let initialUser: User = savedUser ? JSON.parse(savedUser) : mockUsers[0];
     if (initialUser && initialUser.onboardingCompleted === undefined) {
@@ -258,6 +270,8 @@ export function loadInitialState(): InitialAppState {
       workflows: migrateWorkflows(initialWorkflows),
       notifications: savedNotifications ? JSON.parse(savedNotifications) : mockNotifications,
       auditLog: savedAuditLog ? JSON.parse(savedAuditLog) : mockAuditLog,
+      sprints: initialSprints,
+      labels: initialLabels,
     };
   } catch (err) {
     console.warn('TaskFlow: Error loading localStorage, falling back to seed data:', err);
@@ -269,6 +283,8 @@ export function loadInitialState(): InitialAppState {
       workflows: migrateWorkflows(mockWorkflows),
       notifications: mockNotifications,
       auditLog: mockAuditLog,
+      sprints: mockSprints,
+      labels: mockLabels,
     };
   }
 }

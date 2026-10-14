@@ -110,6 +110,9 @@ export interface Task {
   status: TaskStatus;
   priority?: Priority | null;
   assigneeId?: string | null;
+  assigneeIds?: string[];
+  labels?: string[];
+  sprintId?: string | null;
   creatorId?: string;
   parentId?: string | null;
   startDate?: string | null;
@@ -145,6 +148,31 @@ export interface Task {
   environment?: string;
 
   [key: string]: any;
+}
+
+export type SprintStatus = 'PLANNED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+
+export interface Sprint {
+  id: string;
+  projectId: string;
+  name: string;
+  goal?: string | null;
+  startDate: string;
+  endDate: string;
+  status: SprintStatus;
+  workItemIds?: string[];
+  createdById?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  [key: string]: any;
+}
+
+export interface Label {
+  id: string;
+  name: string;
+  color: string;
+  projectId?: string;
+  description?: string;
 }
 
 export interface WorkflowStatus {
@@ -251,6 +279,7 @@ export interface AppContextValue {
   switchUser: (userId: string) => void;
   projects: Project[];
   createProject: (projectData: Partial<Project>) => Project | null;
+  updateProject: (projectId: string, updates: Partial<Project>) => boolean;
   renameProject: (projectId: string, name: string) => boolean;
   updateProjectVisibility: (projectId: string, visibility: ProjectVisibility) => boolean;
   updateProjectKey: (projectId: string, key: string) => { success: boolean; error?: string };
@@ -306,6 +335,13 @@ export interface AppContextValue {
   crossTabIndicator: boolean;
   resetDemoState: () => void;
   allUsers: User[];
+  sprints: Sprint[];
+  projectSprints: Sprint[];
+  createSprint: (sprintData: Partial<Sprint>) => Promise<{ success: boolean; sprint?: Sprint; reason?: string }>;
+  labels: Label[];
+  projectLabels: Label[];
+  createLabel: (labelData: Partial<Label>) => Label;
+  deleteLabel: (labelId: string) => void;
   [key: string]: any;
 }
 

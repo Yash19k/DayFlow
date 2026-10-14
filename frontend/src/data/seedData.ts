@@ -5,7 +5,7 @@
  * 7 Approved Default Statuses: Backlog, In Progress, In Review, Testing / QA, Blocked, On Hold, Done.
  */
 
-import { User, Workflow, Project, Task, Notification, AuditLogEntry, Company } from '../types';
+import { User, Workflow, Project, Task, Notification, AuditLogEntry, Company, Sprint, Label } from '../types';
 
 export const defaultCompany: Company = {
   id: 'comp-1',
@@ -1306,4 +1306,39 @@ export const mockAuditLog: AuditLogEntry[] = [
     timestamp: '2026-09-28T09:00:00Z',
     canUndo: false,
   },
+];
+
+export const mockSprints: Sprint[] = [
+  {
+    id: 'sprint-1',
+    projectId: 'proj-1',
+    name: 'Sprint 1 - Core Engine',
+    goal: 'Deliver graph cycle detection, business day auto-scheduling, and initial task states.',
+    startDate: '2026-10-01',
+    endDate: '2026-10-15',
+    status: 'ACTIVE',
+    workItemIds: ['tf-1', 'tf-2', 'tf-3', 'tf-4'],
+    createdById: 'user-1',
+    createdAt: '2026-10-01T08:00:00Z',
+  },
+  {
+    id: 'sprint-2',
+    projectId: 'proj-1',
+    name: 'Sprint 2 - Enterprise Polish',
+    goal: 'Implement workflow transitions, role governance, and advanced metrics.',
+    startDate: '2026-10-16',
+    endDate: '2026-10-31',
+    status: 'PLANNED',
+    workItemIds: ['tf-5', 'tf-6'],
+    createdById: 'user-1',
+    createdAt: '2026-10-12T09:00:00Z',
+  },
+];
+
+export const mockLabels: Label[] = [
+  { id: 'lbl-1', name: 'Frontend', color: '#3B82F6', projectId: 'proj-1', description: 'User interface components and views' },
+  { id: 'lbl-2', name: 'Backend', color: '#10B981', projectId: 'proj-1', description: 'Server endpoints and data models' },
+  { id: 'lbl-3', name: 'Bug', color: '#EF4444', projectId: 'proj-1', description: 'Defects requiring investigation' },
+  { id: 'lbl-4', name: 'High Priority', color: '#F97316', projectId: 'proj-1', description: 'Critical roadmap item' },
+  { id: 'lbl-5', name: 'DevOps', color: '#8B5CF6', projectId: 'proj-1', description: 'Build systems and deployments' },
 ];

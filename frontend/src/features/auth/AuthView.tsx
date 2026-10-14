@@ -33,6 +33,7 @@ export function AuthView({ isSignup = false }: AuthViewProps) {
     }
 
     if (isSignup) {
+      sessionStorage.setItem('pending_signup_password', password);
       registerUser({ name, email });
       showToast('Account created! Please set up your company workspace.', 'success');
       navigate('/onboarding/company');

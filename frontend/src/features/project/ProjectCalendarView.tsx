@@ -6,7 +6,6 @@ import { Dialog } from '../../components/ui/Dialog';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Avatar } from '../../components/ui/Avatar';
 import { WorkItemTypeBadge, StatusBadge } from '../../components/ui/Badge';
-import { getTaskDateContext } from '../../domain/recurrence';
 import type { Task } from '../../types';
 
 interface ProjectCalendarViewProps {
@@ -19,6 +18,8 @@ interface CalendarDay {
   isToday?: boolean;
   dateStr: string;
 }
+
+import { isTaskDueOnCalendarDate } from '../../domain/calendar';
 
 export function ProjectCalendarView({ onOpenCreateTask }: ProjectCalendarViewProps) {
   const { projectTasks, openTaskDrawer, allUsers } = useApp();
@@ -137,21 +138,10 @@ export function ProjectCalendarView({ onOpenCreateTask }: ProjectCalendarViewPro
     });
   }, [selectedDateStr]);
 
-  // Filter tasks for the selected date (deduplicated by task.id)
+  // Tasks due strictly on the selected date
   const selectedDayTasks = useMemo(() => {
     if (!selectedDateStr) return [];
-    const seen = new Set<string>();
-    const results: Array<{ task: Task; contextLabel: string }> = [];
-
-    for (const t of projectTasks) {
-      if (seen.has(t.id)) continue;
-      const ctx = getTaskDateContext(t, selectedDateStr);
-      if (ctx) {
-        seen.add(t.id);
-        results.push({ task: t, contextLabel: ctx });
-      }
-    }
-    return results;
+    return projectTasks.filter((t: Task) => isTaskDueOnCalendarDate(t, selectedDateStr));
   }, [projectTasks, selectedDateStr]);
 
   return (
@@ -206,9 +196,9 @@ export function ProjectCalendarView({ onOpenCreateTask }: ProjectCalendarViewPro
       {/* Calendar Grid */}
       <div className="flex-1 grid grid-cols-7 auto-rows-fr divide-x divide-y divide-border/60 overflow-y-auto">
         {calendarDays.map((cell) => {
-          // Tasks relevant to this day
-          const dayTasks = projectTasks.filter(
-            (t: Task) => getTaskDateContext(t, cell.dateStr) !== null
+          // Tasks strictly due on this specific calendar date
+          const dayTasks = projectTasks.filter((t: Task) =>
+            isTaskDueOnCalendarDate(t, cell.dateStr)
           );
 
           return (
@@ -238,8 +228,8 @@ export function ProjectCalendarView({ onOpenCreateTask }: ProjectCalendarViewPro
                 </span>
 
                 {dayTasks.length > 0 && (
-                  <span className="text-[10px] text-text-muted font-mono">
-                    {dayTasks.length}
+                  <span className="text-[10px] text-text-muted font-mono font-medium">
+                    {dayTasks.length} {dayTasks.length === 1 ? 'due' : 'due'}
                   </span>
                 )}
               </div>
@@ -260,7 +250,7 @@ export function ProjectCalendarView({ onOpenCreateTask }: ProjectCalendarViewPro
                           ? 'bg-rose-500/15 border-rose-500/30 text-rose-300'
                           : 'bg-surface-elevated border-border text-text-primary hover:border-brand-primary'
                     }`}
-                    title={`${task.type || 'Task'}: ${task.title}`}
+                    title={`${task.type || 'Task'}: ${task.title} (Due: ${task.dueDate})`}
                   >
                     <WorkItemTypeBadge type={task.type} size="sm" showLabel={false} />
                     <span className="truncate">{task.title}</span>
@@ -288,18 +278,18 @@ export function ProjectCalendarView({ onOpenCreateTask }: ProjectCalendarViewPro
               {selectedDateFormatted}
             </span>
             <span className="ml-2 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-surface-elevated border border-border text-text-secondary">
-              {selectedDayTasks.length} {selectedDayTasks.length === 1 ? 'task' : 'tasks'}
+              {selectedDayTasks.length} {selectedDayTasks.length === 1 ? 'task due' : 'tasks due'}
             </span>
           </div>
         }
-        description="Focused overview of active tasks, milestones, and deadlines for this day."
+        description="Work items with their actual due date on this day."
         maxWidth="max-w-xl"
       >
         <div className="space-y-4">
           {/* Quick Action Toolbar */}
           <div className="flex items-center justify-between pb-3 border-b border-border">
             <span className="text-xs text-text-muted">
-              Scheduled tasks across start, due, or recurring instances.
+              Showing work items specifically scheduled with a due date on this day.
             </span>
             <Button
               variant="primary"
@@ -311,7 +301,7 @@ export function ProjectCalendarView({ onOpenCreateTask }: ProjectCalendarViewPro
                 if (targetDate) onOpenCreateTask(targetDate);
               }}
             >
-              Create task for this date
+              Add task for this date
             </Button>
           </div>
 
@@ -319,9 +309,9 @@ export function ProjectCalendarView({ onOpenCreateTask }: ProjectCalendarViewPro
           {selectedDayTasks.length === 0 ? (
             <EmptyState
               icon={CalendarDays}
-              title="No tasks scheduled for this day"
-              description="There are no active start dates, due dates, or recurring occurrences for this date."
-              actionLabel="Create task for this date"
+              title="No work items due on this date"
+              description="There are no project tasks with a due date on this day. Undated tasks are not placed on arbitrary calendar dates."
+              actionLabel="Add task for this date"
               onAction={() => {
                 const targetDate = selectedDateStr;
                 setSelectedDateStr(null);
@@ -330,8 +320,11 @@ export function ProjectCalendarView({ onOpenCreateTask }: ProjectCalendarViewPro
             />
           ) : (
             <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
-              {selectedDayTasks.map(({ task, contextLabel }) => {
-                const assignee = allUsers.find((u) => u.id === task.assigneeId);
+              {selectedDayTasks.map((task) => {
+                const assignedUsers = (task.assigneeIds && task.assigneeIds.length > 0)
+                  ? allUsers.filter((u) => task.assigneeIds?.includes(u.id))
+                  : allUsers.filter((u) => u.id === task.assigneeId);
+
                 return (
                   <div
                     key={task.id}
@@ -348,18 +341,9 @@ export function ProjectCalendarView({ onOpenCreateTask }: ProjectCalendarViewPro
                           {task.title}
                         </span>
                       </div>
-                      <span
-                        className={`text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0 border ${
-                          contextLabel === 'Due today'
-                            ? 'bg-rose-500/10 text-rose-300 border-rose-500/20'
-                            : contextLabel === 'Starts today'
-                              ? 'bg-sky-500/10 text-sky-300 border-sky-500/20'
-                              : contextLabel === 'Recurring occurrence'
-                                ? 'bg-purple-500/10 text-purple-300 border-purple-500/20'
-                                : 'bg-surface text-text-muted border-border'
-                        }`}
-                      >
-                        {contextLabel}
+
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0 border bg-rose-500/10 text-rose-300 border-rose-500/20">
+                        Due this date
                       </span>
                     </div>
 
@@ -382,10 +366,16 @@ export function ProjectCalendarView({ onOpenCreateTask }: ProjectCalendarViewPro
                       </div>
 
                       <div className="flex items-center gap-2">
-                        {assignee ? (
+                        {assignedUsers.length > 0 ? (
                           <div className="flex items-center gap-1.5">
-                            <Avatar user={assignee} size="xs" />
-                            <span className="text-[11px] text-text-secondary">{assignee.name}</span>
+                            <div className="flex -space-x-1.5 overflow-hidden">
+                              {assignedUsers.slice(0, 3).map((u) => (
+                                <Avatar key={u.id} user={u} size="xs" />
+                              ))}
+                            </div>
+                            <span className="text-[11px] text-text-secondary truncate max-w-[120px]">
+                              {assignedUsers.map((u) => u.name).join(', ')}
+                            </span>
                           </div>
                         ) : (
                           <span className="text-[11px] text-text-muted">Unassigned</span>

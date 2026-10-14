@@ -9,7 +9,7 @@ import { validateHierarchy } from '../domain/hierarchy';
 import { WORK_ITEM_TYPES, sanitizeWorkItemData } from '../domain/workItems';
 import { createNextRecurringTask } from '../domain/recurrence';
 import { normalizeProjectId, validateProjectId } from '../domain/projects';
-import { mockUsers, mockProjects, mockTasks, mockWorkflows, mockNotifications, mockAuditLog, defaultCompany } from '../data/seedData';
+import { mockUsers, mockProjects, mockTasks, mockWorkflows, mockNotifications, mockAuditLog, defaultCompany, mockSprints, mockLabels } from '../data/seedData';
 import {
   AppContextValue,
   User,
@@ -25,7 +25,11 @@ import {
   Priority,
   TaskStatus,
   Role,
+  Sprint,
+  SprintStatus,
+  Label,
 } from '../types';
+import { createSprintApi } from '../services/api';
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const initial = useMemo(() => loadInitialState(), []);
@@ -37,6 +41,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [workflows, setWorkflows] = useState<Workflow[]>(initial.workflows);
   const [notifications, setNotifications] = useState<Notification[]>(initial.notifications);
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>(initial.auditLog);
+  const [sprints, setSprints] = useState<Sprint[]>(initial.sprints || []);
+  const [labels, setLabels] = useState<Label[]>(initial.labels || []);
 
   // Navigation & UI state
   const [activeRoute, setActiveRoute] = useState<string>(() => {
@@ -86,6 +92,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => saveStateToStorage('WORKFLOWS', workflows), [workflows]);
   useEffect(() => saveStateToStorage('NOTIFICATIONS', notifications), [notifications]);
   useEffect(() => saveStateToStorage('AUDIT_LOG', auditLog), [auditLog]);
+  useEffect(() => saveStateToStorage('SPRINTS', sprints), [sprints]);
+  useEffect(() => saveStateToStorage('LABELS', labels), [labels]);
 
   // Toast helper
   const showToast = useCallback((message: string, type: ToastType = 'info') => {
@@ -176,6 +184,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return tasks.filter((t) => t.assigneeId === currentUser.id);
   }, [tasks, currentUser.id]);
 
+  // Sprints for current project
+  const projectSprints = useMemo(() => {
+    if (!currentProject) return [];
+    return sprints.filter((s) => s.projectId === currentProject.id);
+  }, [sprints, currentProject]);
+
+  // Labels for current project or global
+  const projectLabels = useMemo(() => {
+    if (!currentProject) return labels;
+    return labels.filter((l) => !l.projectId || l.projectId === currentProject.id);
+  }, [labels, currentProject]);
+
   // --- Task Operations ---
   const createTask = useCallback((formData: any) => {
     if (!hasPermission(currentUser.role, PERMISSIONS.CREATE_TASK)) {
@@ -202,7 +222,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       description: sanitized.description || '',
       status: sanitized.status || 'Backlog',
       priority: sanitized.priority !== undefined ? sanitized.priority : null,
-      assigneeId: sanitized.assigneeId || null,
+      assigneeId: sanitized.assigneeId || (sanitized.assigneeIds?.[0] ?? null),
+      assigneeIds: Array.isArray(sanitized.assigneeIds)
+        ? sanitized.assigneeIds
+        : (sanitized.assigneeId ? [sanitized.assigneeId] : []),
+      labels: Array.isArray(sanitized.labels) ? sanitized.labels : [],
+      sprintId: sanitized.sprintId || null,
       creatorId: currentUser.id,
       startDate: sanitized.startDate || null,
       dueDate: sanitized.dueDate || null,
@@ -807,6 +832,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return newProj;
   }, [currentUser, recordAudit, showToast]);
 
+  const updateProject = useCallback((projectId: string, updates: Partial<Project>) => {
+    if (!hasPermission(currentUser.role, PERMISSIONS.EDIT_PROJECT_SETTINGS)) {
+      showToast('Permission denied: Only Managers and Admins can edit project settings', 'error');
+      return false;
+    }
+
+    const target = projects.find((p) => p.id === projectId);
+    if (!target) return false;
+
+    const updated = {
+      ...target,
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    };
+
+    setProjects((prev) => prev.map((p) => (p.id === projectId ? updated : p)));
+    recordAudit('updated', 'project', projectId, `Updated settings for project "${updated.name}"`, target, updated, false, projectId);
+    showToast(`Project settings saved`, 'success');
+    return true;
+  }, [currentUser.role, projects, recordAudit, showToast]);
+
   const renameProject = useCallback((projectId: string, newName: string) => {
     if (!hasPermission(currentUser.role, PERMISSIONS.EDIT_PROJECT_SETTINGS)) {
       showToast('Permission denied: Only Managers and Admins can rename projects', 'error');
@@ -1132,6 +1178,79 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [currentUser, recordAudit]);
 
+  // Sprint operations
+  const createSprint = useCallback(async (sprintData: Partial<Sprint>) => {
+    const targetProjectId = sprintData.projectId || currentProjectId;
+    const newSprint: Sprint = {
+      id: `sprint-${Date.now()}`,
+      projectId: targetProjectId,
+      name: (sprintData.name || '').trim(),
+      goal: sprintData.goal || null,
+      startDate: sprintData.startDate || new Date().toISOString().split('T')[0],
+      endDate: sprintData.endDate || new Date().toISOString().split('T')[0],
+      status: (sprintData.status || 'PLANNED') as SprintStatus,
+      workItemIds: sprintData.workItemIds || [],
+      createdById: currentUser.id,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    try {
+      await createSprintApi(targetProjectId, {
+        name: newSprint.name,
+        goal: newSprint.goal,
+        startDate: newSprint.startDate,
+        endDate: newSprint.endDate,
+      });
+    } catch (err: any) {
+      console.warn('TaskFlow: Backend createSprint notification:', err.message);
+    }
+
+    setSprints((prev) => [newSprint, ...prev]);
+
+    if (newSprint.workItemIds && newSprint.workItemIds.length > 0) {
+      setTasks((prev) =>
+        prev.map((t) =>
+          newSprint.workItemIds!.includes(t.id) ? { ...t, sprintId: newSprint.id } : t
+        )
+      );
+    }
+
+    recordAudit('created', 'sprint', newSprint.id, `Created sprint "${newSprint.name}"`, null, newSprint, false, targetProjectId);
+    showToast(`Sprint "${newSprint.name}" created`, 'success');
+    return { success: true, sprint: newSprint };
+  }, [currentProjectId, currentUser.id, recordAudit, showToast]);
+
+  // Label operations
+  const createLabel = useCallback((labelData: Partial<Label>): Label => {
+    const targetProjectId = labelData.projectId || currentProjectId;
+    const newLabel: Label = {
+      id: `lbl-${Date.now()}`,
+      name: (labelData.name || '').trim(),
+      color: labelData.color || '#3B82F6',
+      projectId: targetProjectId,
+      description: labelData.description || '',
+    };
+    setLabels((prev) => [...prev, newLabel]);
+    recordAudit('created', 'label', newLabel.id, `Created label "${newLabel.name}"`, null, newLabel, false, targetProjectId);
+    showToast(`Label "${newLabel.name}" created`, 'success');
+    return newLabel;
+  }, [currentProjectId, recordAudit, showToast]);
+
+  const deleteLabel = useCallback((labelId: string) => {
+    const target = labels.find((l) => l.id === labelId);
+    setLabels((prev) => prev.filter((l) => l.id !== labelId));
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.labels ? { ...t, labels: t.labels.filter((id) => id !== labelId && id !== target?.name) } : t
+      )
+    );
+    if (target) {
+      recordAudit('deleted', 'label', labelId, `Deleted label "${target.name}"`, target, null, false, target.projectId);
+    }
+    showToast('Label removed', 'info');
+  }, [labels, recordAudit, showToast]);
+
   // Reset Demo State
   const resetDemoState = useCallback(() => {
     resetAllStorage();
@@ -1142,6 +1261,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setWorkflows(mockWorkflows);
     setNotifications(mockNotifications);
     setAuditLog(mockAuditLog);
+    setSprints(mockSprints);
+    setLabels(mockLabels);
     setCurrentProjectId('proj-1');
     setProjectTab('overview');
     setActiveDrawerTaskId(null);
@@ -1156,6 +1277,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     switchUser,
     projects,
     createProject,
+    updateProject,
     renameProject,
     updateProjectVisibility,
     updateProjectKey,
@@ -1211,6 +1333,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     crossTabIndicator,
     resetDemoState,
     allUsers: mockUsers,
+    sprints,
+    projectSprints,
+    createSprint,
+    labels,
+    projectLabels,
+    createLabel,
+    deleteLabel,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

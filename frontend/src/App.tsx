@@ -7,6 +7,7 @@ import { Topbar } from './components/navigation/Topbar';
 import { ProjectHeader } from './components/navigation/ProjectHeader';
 import { TaskDetailsDrawer } from './components/tasks/TaskDetailsDrawer';
 import { CreateTaskModal } from './components/tasks/CreateTaskModal';
+import { CreateSprintModal } from './components/sprints/CreateSprintModal';
 import { CreateProjectModal } from './components/modals/CreateProjectModal';
 import { GlobalSearchModal } from './components/modals/GlobalSearchModal';
 import { ImpactPreviewModal } from './components/modals/ImpactPreviewModal';
@@ -27,18 +28,17 @@ import { ProjectCalendarView } from './features/project/ProjectCalendarView';
 import { ProjectDashboardView } from './features/project/ProjectDashboardView';
 import { WorkflowBuilderView } from './features/project/WorkflowBuilderView';
 import { DependenciesView } from './features/project/DependenciesView';
-import { ProjectMembersView } from './features/project/ProjectMembersView';
-import { ProjectActivityView } from './features/project/ProjectActivityView';
 import { ProjectSettingsView } from './features/project/ProjectSettingsView';
 import { SettingsView } from './features/settings/SettingsView';
 import { AuthView } from './features/auth/AuthView';
 import { CompanySetupView } from './features/onboarding/CompanySetupView';
 
 function MainAppShell() {
-  const { activeRoute, projectTab, currentUser, currentProject, navigate } = useApp();
+  const { activeRoute, projectTab, currentUser, currentProject, currentWorkflow, navigate } = useApp();
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
+  const [createSprintOpen, setCreateSprintOpen] = useState(false);
   const [createTaskInitialDate, setCreateTaskInitialDate] = useState<string | undefined>();
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -96,7 +96,12 @@ function MainAppShell() {
         />
 
         {/* Persistent Project Header if in project context and accessible */}
-        {isProjectRoute && currentProject && hasProjectAccess && <ProjectHeader />}
+        {isProjectRoute && currentProject && hasProjectAccess && (
+          <ProjectHeader
+            onOpenCreateTask={() => setCreateTaskOpen(true)}
+            onOpenCreateSprint={() => setCreateSprintOpen(true)}
+          />
+        )}
 
         {/* Main View Router */}
         <main className="flex-1 overflow-y-auto">
@@ -153,11 +158,18 @@ function MainAppShell() {
                   />
                 )}
                 {projectTab === 'dashboard' && <ProjectDashboardView />}
-                {projectTab === 'workflow' && <WorkflowBuilderView />}
+                {projectTab === 'workflow' && <WorkflowBuilderView key={currentWorkflow?.id} />}
                 {projectTab === 'dependencies' && <DependenciesView />}
-                {projectTab === 'members' && <ProjectMembersView />}
-                {projectTab === 'activity' && <ProjectActivityView />}
-                {projectTab === 'settings' && <ProjectSettingsView />}
+                {/* Direct-link backwards compatibility for /members and /activity URLs to Settings sections */}
+                {projectTab === 'members' && (
+                  <ProjectSettingsView key={`${currentProject.id}-members`} initialSection="members" />
+                )}
+                {projectTab === 'activity' && (
+                  <ProjectSettingsView key={`${currentProject.id}-activity`} initialSection="activity" />
+                )}
+                {projectTab === 'settings' && (
+                  <ProjectSettingsView key={currentProject.id} />
+                )}
               </>
             )
           ) : activeRoute === '/my-tasks' ? (
@@ -182,6 +194,10 @@ function MainAppShell() {
           setCreateTaskOpen(false);
           setCreateTaskInitialDate(undefined);
         }}
+      />
+      <CreateSprintModal
+        isOpen={createSprintOpen}
+        onClose={() => setCreateSprintOpen(false)}
       />
       <CreateProjectModal
         isOpen={createProjectOpen}

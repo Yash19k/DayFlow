@@ -27,7 +27,7 @@ export function CreateTaskModal({
   initialDueDate,
   initialStartDate,
 }: CreateTaskModalProps) {
-  const { createTask, currentProject, allUsers, currentWorkflow, tasks } = useApp();
+  const { createTask, currentProject, allUsers, currentWorkflow, tasks, projectLabels } = useApp();
 
   // Core Common Fields - default to unassigned, no priority, empty dates and hours
   const [type, setType] = useState<WorkItemType>(WORK_ITEM_TYPES.TASK);
@@ -38,6 +38,8 @@ export function CreateTaskModal({
   const [status, setStatus] = useState('Backlog');
   const [priority, setPriority] = useState<Priority | ''>('');
   const [assigneeId, setAssigneeId] = useState('');
+  const [selectedAssigneeIds, setSelectedAssigneeIds] = useState<string[]>([]);
+  const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
   const [startDate, setStartDate] = useState(initialStartDate || '');
   const [dueDate, setDueDate] = useState(initialDueDate || '');
   const [estimateHours, setEstimateHours] = useState<number | string>('');
@@ -86,6 +88,18 @@ export function CreateTaskModal({
     setErrors({});
   }
 
+  function handleToggleAssignee(userId: string) {
+    setSelectedAssigneeIds((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+    );
+  }
+
+  function handleToggleLabel(labelName: string) {
+    setSelectedLabels((prev) =>
+      prev.includes(labelName) ? prev.filter((l) => l !== labelName) : [...prev, labelName]
+    );
+  }
+
   function validateForm() {
     const errs: Record<string, string> = {};
     if (!title.trim()) {
@@ -119,6 +133,12 @@ export function CreateTaskModal({
     e.preventDefault();
     if (!validateForm()) return;
 
+    const allAssignees = selectedAssigneeIds.length > 0
+      ? selectedAssigneeIds
+      : assigneeId
+        ? [assigneeId]
+        : [];
+
     const payload: Record<string, any> = {
       type,
       parentId: parentId || null,
@@ -128,7 +148,9 @@ export function CreateTaskModal({
       sectionId,
       status,
       priority: priority || null,
-      assigneeId: assigneeId || null,
+      assigneeId: allAssignees[0] || null,
+      assigneeIds: allAssignees,
+      labels: selectedLabels,
       startDate: startDate || null,
       dueDate: dueDate || null,
       estimateHours: estimateHours !== '' ? Number(estimateHours) : null,
@@ -174,6 +196,8 @@ export function CreateTaskModal({
     setStatus('Backlog');
     setPriority('');
     setAssigneeId('');
+    setSelectedAssigneeIds([]);
+    setSelectedLabels([]);
     setStartDate(initialStartDate || '');
     setDueDate(initialDueDate || '');
     setRecFrequency('none');
@@ -374,7 +398,7 @@ export function CreateTaskModal({
           </div>
         )}
 
-        {/* Section & Assignee */}
+        {/* Section */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Select
             label="Section"
@@ -388,18 +412,103 @@ export function CreateTaskModal({
             ))}
           </Select>
 
-          <Select
-            label="Assignee"
-            value={assigneeId}
-            onChange={(e) => setAssigneeId(e.target.value)}
-          >
-            <option value="">-- No assignee (Unassigned) --</option>
-            {allUsers.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name} ({u.role})
-              </option>
-            ))}
-          </Select>
+          {/* Primary / Additional Assignee Picker */}
+          <div>
+            <label className="block text-xs font-medium text-text-secondary mb-1.5">
+              Assignees (Multiple Supported)
+            </label>
+            <select
+              value=""
+              onChange={(e) => {
+                if (e.target.value) handleToggleAssignee(e.target.value);
+              }}
+              className="w-full h-9 rounded-lg bg-surface border border-border px-2 text-xs text-text-primary focus:outline-none"
+            >
+              <option value="">+ Add or remove assignee...</option>
+              {allUsers.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {selectedAssigneeIds.includes(u.id) ? '✓ ' : ''}
+                  {u.name} ({u.role})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Selected Assignees Chips */}
+        {selectedAssigneeIds.length > 0 && (
+          <div className="p-2.5 rounded-lg bg-surface-elevated border border-border flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="text-[11px] text-text-muted mr-1 font-medium">Assigned:</span>
+            {selectedAssigneeIds.map((uid) => {
+              const userObj = allUsers.find((u) => u.id === uid);
+              return (
+                <span
+                  key={uid}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-primary/10 text-brand-primary border border-brand-primary/20 text-xs font-medium"
+                >
+                  <span>{userObj?.name || uid}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleAssignee(uid)}
+                    className="hover:text-rose-400 ml-0.5"
+                    title="Remove assignee"
+                  >
+                    ×
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Labels Selector (Section 13) */}
+        <div>
+          <label className="block text-xs font-medium text-text-secondary mb-1.5">
+            Labels
+          </label>
+          <div className="flex flex-wrap items-center gap-1.5 p-2 rounded-lg bg-surface border border-border min-h-[38px]">
+            {selectedLabels.map((lbl) => {
+              const labelDef = projectLabels.find((l) => l.name === lbl);
+              const color = labelDef?.color || '#3B82F6';
+              return (
+                <span
+                  key={lbl}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-white"
+                  style={{ backgroundColor: `${color}30`, borderColor: color, borderWidth: 1 }}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
+                  <span style={{ color }}>{lbl}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleLabel(lbl)}
+                    className="hover:opacity-75 text-text-muted ml-0.5"
+                    title="Remove label"
+                  >
+                    ×
+                  </button>
+                </span>
+              );
+            })}
+            <select
+              value=""
+              onChange={(e) => {
+                if (e.target.value) handleToggleLabel(e.target.value);
+              }}
+              className="bg-transparent text-xs text-text-secondary focus:outline-none cursor-pointer py-0.5 px-1"
+            >
+              <option value="" className="bg-surface text-text-primary">+ Select label...</option>
+              {projectLabels.map((l) => (
+                <option
+                  key={l.id}
+                  value={l.name}
+                  disabled={selectedLabels.includes(l.name)}
+                  className="bg-surface text-text-primary"
+                >
+                  {selectedLabels.includes(l.name) ? '✓ ' : ''}{l.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* Status, Priority, Start Date, Due Date */}

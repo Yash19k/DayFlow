@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Star,
-  Share2,
   LayoutGrid,
   ListFilter,
   Kanban,
@@ -10,22 +9,16 @@ import {
   CalendarDays,
   Workflow,
   Network,
-  Users2,
-  History,
-  Pencil,
-  Trash2,
   Lock,
   Globe,
   LucideIcon,
-  AlertTriangle,
   Settings,
+  Plus,
+  Sparkles,
 } from 'lucide-react';
 import { useApp } from '../../hooks/useApp';
 import { AvatarGroup } from '../ui/Avatar';
-import { Dialog } from '../ui/Dialog';
-import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
-import { hasPermission, PERMISSIONS } from '../../domain/permissions';
 
 interface TabItem {
   id: string;
@@ -33,23 +26,19 @@ interface TabItem {
   icon: LucideIcon;
 }
 
-export function ProjectHeader() {
+export interface ProjectHeaderProps {
+  onOpenCreateTask?: () => void;
+  onOpenCreateSprint?: () => void;
+}
+
+export function ProjectHeader({ onOpenCreateTask, onOpenCreateSprint }: ProjectHeaderProps) {
   const {
     currentProject,
     projectTab,
     setProjectTab,
     allUsers,
     navigate,
-    currentUser,
-    renameProject,
-    deleteProject,
   } = useApp();
-
-  const [renameModalOpen, setRenameModalOpen] = useState(false);
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [renameName, setRenameName] = useState('');
-  const [renameError, setRenameError] = useState('');
-  const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   if (!currentProject) return null;
 
@@ -57,9 +46,8 @@ export function ProjectHeader() {
     (currentProject.memberIds || []).includes(u.id)
   );
 
-  const canEdit = hasPermission(currentUser.role, PERMISSIONS.EDIT_PROJECT_SETTINGS);
-  const canDelete = hasPermission(currentUser.role, PERMISSIONS.DELETE_PROJECT);
-
+  // Primary project navigation sections:
+  // Members and Activity & Audit are moved into Project Settings
   const tabs: TabItem[] = [
     { id: 'overview', label: 'Overview', icon: LayoutGrid },
     { id: 'list', label: 'List', icon: ListFilter },
@@ -69,8 +57,6 @@ export function ProjectHeader() {
     { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
     { id: 'dependencies', label: 'Dependencies', icon: Network },
     { id: 'workflow', label: 'Workflow', icon: Workflow },
-    { id: 'members', label: 'Members', icon: Users2 },
-    { id: 'activity', label: 'Activity & Audit', icon: History },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
@@ -80,43 +66,15 @@ export function ProjectHeader() {
     navigate(`/project/${currentProject.id}/${tabId}`);
   }
 
-  function handleOpenRename() {
-    setRenameName(currentProject?.name || '');
-    setRenameError('');
-    setRenameModalOpen(true);
-  }
-
-  function handleRenameSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  function handleManageMembersClick() {
     if (!currentProject) return;
-    const trimmed = renameName.trim();
-    if (!trimmed) {
-      setRenameError('Project name cannot be empty');
-      return;
-    }
-
-    const success = renameProject(currentProject.id, trimmed);
-    if (success) {
-      setRenameModalOpen(false);
-    }
-  }
-
-  function handleOpenDelete() {
-    setDeleteConfirmText('');
-    setDeleteModalOpen(true);
-  }
-
-  function handleConfirmDelete(e?: React.FormEvent) {
-    if (e) e.preventDefault();
-    if (!currentProject || deleteConfirmText.trim() !== 'DELETE') return;
-    deleteProject(currentProject.id);
-    setDeleteModalOpen(false);
-    setDeleteConfirmText('');
+    setProjectTab('settings');
+    navigate(`/project/${currentProject.id}/settings#members`);
   }
 
   return (
     <div className="bg-surface border-b border-border flex-shrink-0 select-none">
-      {/* Top row: Project Title, Key, Visibility, Status, Members, Actions */}
+      {/* Top row: Project Title, Key, Visibility, Status, Members, Primary Actions */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 pt-3.5 pb-2.5">
         <div className="flex items-center gap-3 min-w-0">
           <div
@@ -176,6 +134,7 @@ export function ProjectHeader() {
               <button
                 className="text-text-muted hover:text-amber-400 transition-colors p-0.5 rounded"
                 title="Star project"
+                aria-label="Star project"
               >
                 <Star size={14} />
               </button>
@@ -186,51 +145,42 @@ export function ProjectHeader() {
           </div>
         </div>
 
-        {/* Right side: Member avatars & controls */}
-        <div className="flex items-center gap-2">
+        {/* Right side: Member avatars & prominent Add Work Item / Add Sprint buttons */}
+        <div className="flex items-center gap-3">
+          {/* Member avatars button: opens Project Settings -> Members */}
           <button
-            onClick={() => {
-              setProjectTab('members');
-              navigate(`/project/${currentProject.id}/members`);
-            }}
+            onClick={handleManageMembersClick}
             className="flex items-center gap-1.5 p-1 -m-1 rounded-lg hover:bg-surface-elevated border border-transparent hover:border-border transition-colors cursor-pointer group focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-primary"
-            title="View project members"
-            aria-label="View project members"
+            title="Manage project members"
+            aria-label="Manage project members"
           >
             <AvatarGroup users={projectMembers} max={4} />
           </button>
 
-          {/* Edit / Rename Project Action */}
-          {canEdit && (
-            <button
-              onClick={handleOpenRename}
-              className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-border bg-surface-elevated text-xs font-medium text-text-secondary hover:text-text-primary hover:border-border-strong transition-colors cursor-pointer"
-              title="Edit project name"
+          {/* Prominent Header Actions: Add Work Item and Add Sprint side-by-side */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="primary"
+              size="sm"
+              icon={Plus}
+              onClick={onOpenCreateTask}
+              className="font-medium h-7 px-2.5 text-xs shadow-xs"
+              title="Add Work Item to this project"
             >
-              <Pencil size={12} />
-              <span className="hidden sm:inline">Rename</span>
-            </button>
-          )}
+              <span>Add Work Item</span>
+            </Button>
 
-          {/* Delete Project Action */}
-          {canDelete && (
-            <button
-              onClick={handleOpenDelete}
-              className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-border bg-surface-elevated text-xs font-medium text-text-secondary hover:text-rose-400 hover:border-rose-500/40 transition-colors cursor-pointer"
-              title="Delete project"
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={Sparkles}
+              onClick={onOpenCreateSprint}
+              className="font-medium h-7 px-2.5 text-xs border-border bg-surface-elevated hover:bg-surface hover:border-border-strong text-text-primary"
+              title="Create a new sprint"
             >
-              <Trash2 size={12} />
-              <span className="hidden sm:inline">Delete</span>
-            </button>
-          )}
-
-          <button
-            onClick={() => handleTabClick('members')}
-            className="hidden sm:inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-border bg-surface-elevated text-xs font-medium text-text-secondary hover:text-text-primary hover:border-border-strong transition-colors"
-          >
-            <Share2 size={12} />
-            <span>Share</span>
-          </button>
+              <span>Add Sprint</span>
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -256,103 +206,6 @@ export function ProjectHeader() {
           );
         })}
       </nav>
-
-      {/* Rename Project Dialog */}
-      <Dialog
-        isOpen={renameModalOpen}
-        onClose={() => setRenameModalOpen(false)}
-        title="Rename Project"
-        description="Update the display name of this project. The Project ID and history remain stable."
-        maxWidth="max-w-md"
-      >
-        <form onSubmit={handleRenameSubmit} className="space-y-4">
-          <Input
-            label="Project Name *"
-            value={renameName}
-            onChange={(e) => {
-              setRenameName(e.target.value);
-              if (renameError) setRenameError('');
-            }}
-            error={renameError}
-            autoFocus
-          />
-
-          <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setRenameModalOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button variant="primary" size="sm" type="submit">
-              Save Name
-            </Button>
-          </div>
-        </form>
-      </Dialog>
-
-      {/* Delete Project Confirmation Dialog */}
-      <Dialog
-        isOpen={deleteModalOpen}
-        onClose={() => {
-          setDeleteModalOpen(false);
-          setDeleteConfirmText('');
-        }}
-        title="Delete Project"
-        maxWidth="max-w-md"
-      >
-        <form onSubmit={handleConfirmDelete} className="space-y-4">
-          <div className="flex items-start gap-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-300">
-            <AlertTriangle size={18} className="shrink-0 mt-0.5 text-rose-400" />
-            <div className="space-y-1">
-              <p className="font-semibold text-rose-200">
-                Are you sure you want to delete &quot;{currentProject.name}&quot;?
-              </p>
-              <p className="text-[11px] text-rose-300/90 leading-relaxed">
-                This will remove the project, its tasks, sections, and associated prototype data.
-                Global user accounts will remain intact. This action cannot be undone.
-              </p>
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-text-secondary">
-              To confirm deletion, type <span className="font-mono font-bold text-rose-400">DELETE</span> below:
-            </label>
-            <Input
-              value={deleteConfirmText}
-              onChange={(e) => setDeleteConfirmText(e.target.value)}
-              placeholder="Type DELETE to confirm"
-              className="font-mono text-xs"
-              autoFocus
-            />
-          </div>
-
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
-            <Button
-              variant="secondary"
-              size="sm"
-              type="button"
-              onClick={() => {
-                setDeleteModalOpen(false);
-                setDeleteConfirmText('');
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="danger"
-              size="sm"
-              type="submit"
-              icon={Trash2}
-              disabled={deleteConfirmText.trim() !== 'DELETE'}
-            >
-              Delete Project
-            </Button>
-          </div>
-        </form>
-      </Dialog>
     </div>
   );
 }
