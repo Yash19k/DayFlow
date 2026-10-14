@@ -10,6 +10,12 @@ import {
 import { Project } from "./project.entity";
 import { User } from "./user.entity";
 
+export enum ProjectRole {
+  ADMIN = "ADMIN",
+  LEAD = "LEAD",
+  MEMBER = "MEMBER",
+}
+
 @Entity("project_members")
 export class ProjectMember {
   @PrimaryColumn("uuid", { name: "project_id" })
@@ -23,7 +29,13 @@ export class ProjectMember {
     nullable: true,
   })
   addedById!: string | null;
-
+  @Column({
+  type: "enum",
+  enum: ProjectRole,
+  enumName: "project_members_role_enum",
+  default: ProjectRole.MEMBER,
+})
+role!: ProjectRole;
   @CreateDateColumn({ name: "joined_at" })
   joinedAt!: Date;
 

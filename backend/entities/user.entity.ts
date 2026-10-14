@@ -71,7 +71,7 @@ export class User extends BaseEntity {
   updatedAt: Date;
 
   @ManyToOne(() => Organization, (organization) => organization.users, {
-    nullable: false,
+    nullable: true,
     onDelete: "RESTRICT",
   })
   @JoinColumn({ name: "organization_id" })
