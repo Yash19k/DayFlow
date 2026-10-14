@@ -7,6 +7,6 @@ import { registerOrganization } from "../controllers/user.controller";
 const router = Router();
 const userRepository = AppDataSource.getRepository(User);
 
-router.post("/register", registerOrganization);
+router.post("/", registerOrganization);
 
 export default router;

@@ -8,7 +8,7 @@ console.log("App.ts executed");
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use("/api/v1", userRoutes);
+app.use("/api/users", userRoutes);
 
 app.get("/", (_req, res) => {
   res.json({
