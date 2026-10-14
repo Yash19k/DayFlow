@@ -92,3 +92,71 @@ export const createProject = async (
     project: savedProject,
   });
 }
+
+
+export const viewProjects = 
+  async (req: Request, res: Response) => {
+    // 1. Get the authenticated user's ID.
+    const userId = req.user?.id;
+
+    if (!userId) {
+      throw new AppError(
+        "Authentication required",
+        401,
+        "UNAUTHORIZED"
+      );
+    }
+
+    const userRepository = AppDataSource.getRepository(User);
+
+const user = await userRepository.findOne({
+  where: { id: userId },
+  select: {
+    id: true,
+    organizationId: true,
+  },
+});
+
+
+    if (!user) {
+      throw new AppError(
+        "User not found",
+        404,
+        "USER_NOT_FOUND"
+      );
+    }
+
+    const projectRepository = AppDataSource.getRepository(Project);
+
+    const projects = await projectRepository
+      .createQueryBuilder("project")
+      .leftJoin(
+        "project.memberships",
+        "membership",
+        "membership.userId = :userId",
+        { userId: user.id }
+      )
+      .where("project.organizationId = :organizationId", {
+        organizationId: user.organizationId,
+      })
+      .andWhere(
+        `(
+          project.visibility = :publicVisibility
+          OR membership.userId = :userId
+        )`,
+        {
+          publicVisibility: ProjectVisibility.PUBLIC,
+          userId: user.id,
+        }
+      )
+      .orderBy("project.createdAt", "DESC")
+      .getMany();
+
+    res.status(200).json({
+      success: true,
+      message: "Projects retrieved successfully",
+      count: projects.length,
+      data: projects,
+    });
+  }
+
