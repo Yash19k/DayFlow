@@ -168,7 +168,7 @@ export async function currentUser(req: Request, res: Response) {
     throw new AppError("Invalid authentication token.", 401, "INVALID_TOKEN");
   }
 
-  const organization = await organizationRepository.findOne({ where: { id: user.organizationId } });
+  const organization = await organizationRepository.findOne({ where: { id: user.organizationId} });
   if (!organization) {
     throw new AppError("Organization not found.", 404, "ORGANIZATION_NOT_FOUND");
   }

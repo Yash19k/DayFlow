@@ -5,7 +5,7 @@ import {
   acceptOrganizationInvitation,
 } from "../services/member-invitation.service";
 import {
-  inviteMembersSchema,
+  invitedMembers,
   acceptInvitationSchema,
 } from "../validations/project.validations";
 
@@ -15,7 +15,7 @@ export async function inviteMembersController(
   next: NextFunction,
 ) {
   try {
-    const { error, value } = inviteMembersSchema.validate(req.body, {
+    const { error, value } = invitedMembers.validate(req.body, {
       abortEarly: false,
       stripUnknown: true,
     });
@@ -89,7 +89,7 @@ export async function acceptInvitationController(
     if (error) {
       return res.status(400).json({
         message: "Validation failed",
-        errors: error.details.map((detail) => detail.message),
+        errors: error.details.map((detail:any) => detail.message),
       });
     }
 

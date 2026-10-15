@@ -8,7 +8,7 @@ import { Organization } from "../entities/organization.entity";
 import { onboardingSchema } from "../validations/user.validator";
 import { generateAccessToken, generateRefreshToken } from "../utils/auth.token";
 import { UserSession } from "../entities/user.session.entity";
-import { addMembersSchemaA } from "../validations/project.validations";
+import { invitedMemberSchema } from "../validations/project.validations";
 
 const userRepository = AppDataSource.getRepository(User);
 
@@ -114,7 +114,7 @@ export async function registerOrganization(
       path: "/api/auth/refresh",
       expires: refreshExpiry,
     });
-      
+
     req.user = { id: newUser.id, email: newUser.email, role: newUser.role };
 
     return res.status(201).json({
@@ -145,7 +145,7 @@ import { QueryFailedError } from "typeorm";
 
 type AuthenticatedUser = {
   id: string;
-    email: string;
+  email: string;
   organizationId?: string;
   role: UserRole;
 };
@@ -155,7 +155,7 @@ export async function addOrganizationMembers(
   res: Response,
   next: NextFunction,
 ) {
-  const { error, value } = addMembersSchemaA.validate(req.body, {
+  const { error, value } = invitedMemberSchema.validate(req.body, {
     abortEarly: false,
     stripUnknown: true,
   });
@@ -163,7 +163,7 @@ export async function addOrganizationMembers(
   if (error) {
     return res.status(400).json({
       message: "Validation failed",
-      errors: error.details.map((detail) => ({
+      errors: error.details.map((detail: any) => ({
         field: detail.path.join("."),
         message: detail.message,
       })),

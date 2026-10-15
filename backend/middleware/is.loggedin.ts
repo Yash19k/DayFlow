@@ -58,7 +58,7 @@ export const isLoggedIn = async (
     req.user = {
       id: user.id,
       role: user.role,
-      organizationId: user.organizationId,
+      organizationId: user.organizationId ?? undefined,
     };
     next();
   } catch (error: unknown) {

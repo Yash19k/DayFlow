@@ -3,7 +3,8 @@ import nodemailer from "nodemailer";
 const smtpPort = Number(process.env.SMTP_PORT || 587);
 
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
+    host: process.env.SMTP_HOST,
+    service:"gmail",
   port: smtpPort,
   secure: smtpPort === 465,
   auth: {
