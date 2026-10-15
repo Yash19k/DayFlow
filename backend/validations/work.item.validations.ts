@@ -7,6 +7,10 @@ import {
   WorkItemStatus,
   WorkItemPriority,
 } from "../entities/work.item.entity";
+import {
+  RecurrenceFrequency,
+  MonthlyPattern,
+} from "../entities/work.item.recurrence.entity";
 import { AppError } from "../errors/app.error";
 
 
@@ -35,6 +39,31 @@ startDate: Joi.string()
     .allow(null)
     .optional(),
 });
+
+const dateOnlySchema = Joi.string()
+  .pattern(/^\d{4}-\d{2}-\d{2}$/)
+  .custom((value, helpers) => {
+    const date = new Date(`${value}T00:00:00.000Z`);
+    if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+      return helpers.error("any.invalid");
+    }
+    return value;
+  });
+
+const recurrenceSchema = Joi.object({
+  frequency: Joi.string().valid(...Object.values(RecurrenceFrequency)).required(),
+  interval: Joi.number().integer().min(1).default(1),
+  daysOfWeek: Joi.array()
+    .items(Joi.number().integer().min(0).max(6))
+    .unique()
+    .allow(null)
+    .optional(),
+  monthlyPattern: Joi.string().valid(...Object.values(MonthlyPattern)).allow(null).optional(),
+  dayOfMonth: Joi.number().integer().min(1).max(31).allow(null).optional(),
+  startsOn: dateOnlySchema.required(),
+  endsOn: dateOnlySchema.allow(null).optional(),
+  timezone: Joi.string().trim().max(100).default("UTC"),
+}).unknown(false);
 
 export const createWorkItemSchema = Joi.object({
   projectId: Joi.string()
@@ -77,6 +106,8 @@ export const createWorkItemSchema = Joi.object({
     .items(assigneeSchema)
     .unique("userId")
     .default([]),
+
+  recurrence: recurrenceSchema.allow(null).optional(),
 })
   .unknown(false);
 
@@ -103,6 +134,31 @@ export const validateCreateWorkItem = (
     );
   }
 
+  req.body = value;
+  next();
+};
+
+const updateWorkItemSchema = Joi.object({
+  title: Joi.string().trim().min(1).max(255).optional(),
+  description: Joi.string().allow("", null).optional(),
+  priority: Joi.string().valid(...Object.values(WorkItemPriority)).optional(),
+  status: Joi.string().valid(...Object.values(WorkItemStatus)).optional(),
+  dueDate: Joi.date().iso().allow(null).optional(),
+  parentWorkItemId: Joi.string().guid({ version: ["uuidv4"] }).allow(null).optional(),
+}).min(1).unknown(false);
+
+export const validateUpdateWorkItem = (
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+): void => {
+  const { error, value } = updateWorkItemSchema.validate(req.body, {
+    abortEarly: false,
+    convert: true,
+  });
+  if (error) {
+    throw new AppError(error.details.map((detail) => detail.message).join(", "), 400, "VALIDATION_ERROR");
+  }
   req.body = value;
   next();
 };

@@ -9,6 +9,7 @@ import {
 } from "../entities/work.item.entity";
 import { WorkItemAssignee } from "../entities/work.item-assignee.entity";
 import { ProjectMember } from "../entities/project.member.entity";
+import { User } from "../entities/user.entity";
 import { Sprint, SprintStatus } from "../entities/sprint.entities";
 import { AppError } from "../errors/app.error";
 
@@ -51,9 +52,19 @@ export const getProjectDashboard = async (
 
   const projectId = projectIdParam.trim();
 
+  const userId = req.user?.id;
+  if (!userId) {
+    throw new AppError("Authentication required.", 401, "UNAUTHORIZED");
+  }
+
+  const user = await AppDataSource.getRepository(User).findOne({
+    where: { id: userId },
+    select: { id: true, organizationId: true, role: true },
+  });
+
   // Find the project.
   const project = await projectRepo().findOne({
-    where: { id: projectId },
+    where: { id: projectId, organizationId: user?.organizationId },
     select: {
       id: true,
       name: true,
@@ -64,6 +75,17 @@ export const getProjectDashboard = async (
 
   if (!project) {
     throw new AppError("Project not found", 404);
+  }
+
+  if (project.visibility !== "PUBLIC" && user?.role !== "ADMIN") {
+    const membership = await AppDataSource.getRepository(ProjectMember).findOne({
+      where: { projectId, userId },
+      select: { projectId: true, userId: true },
+    });
+
+    if (!membership) {
+      throw new AppError("Project not found", 404, "PROJECT_NOT_FOUND");
+    }
   }
 
   // Base query scoped to the requested project.
@@ -137,19 +159,20 @@ export const getProjectDashboard = async (
     .innerJoin("assignment.workItem", "wi")
     .innerJoin("assignment.user", "user")
     .select("user.id", "userId")
-    .addSelect("user.firstName", "firstName")
-    .addSelect("user.lastName", "lastName")
+    .addSelect("user.fullName", "fullName")
     .addSelect("COUNT(DISTINCT wi.id)", "taskCount")
     .where("wi.projectId = :projectId", { projectId })
+    .andWhere("wi.organizationId = :organizationId", {
+      organizationId: project.organizationId,
+    })
     .groupBy("user.id")
-    .addGroupBy("user.firstName")
-    .addGroupBy("user.lastName")
+    .addGroupBy("user.fullName")
     .orderBy('"taskCount"', "DESC")
     .getRawMany();
 
   const workloadByAssignee = assigneeRows.map((row) => ({
     userId: row.userId,
-    name: [row.firstName, row.lastName].filter(Boolean).join(" "),
+    name: row.fullName,
     taskCount: Number(row.taskCount),
   }));
 

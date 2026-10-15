@@ -514,3 +514,73 @@ export const getProjectWorkItems =async (req: Request, res: Response) => {
       },
     });
   }
+
+export const updateWorkItem = async (req: Request, res: Response) => {
+  const userId = req.user?.id;
+  const workItemId = req.params.workItemId;
+  if (!userId || typeof workItemId !== "string") {
+    throw new AppError("Invalid work item request.", 400, "INVALID_WORK_ITEM_ID");
+  }
+
+  const user = await AppDataSource.getRepository(User).findOne({
+    where: { id: userId },
+    select: { id: true, organizationId: true },
+  });
+  const project = await AppDataSource.getRepository(Project)
+    .createQueryBuilder("project")
+    .leftJoin("project.memberships", "membership", "membership.userId = :userId", { userId })
+    .where("project.id = (SELECT work_item.project_id FROM work_items work_item WHERE work_item.id = :workItemId)", { workItemId })
+    .andWhere("project.organizationId = :organizationId", { organizationId: user?.organizationId })
+    .andWhere("(project.visibility = :publicVisibility OR membership.userId = :userId)", {
+      publicVisibility: ProjectVisibility.PUBLIC,
+      userId,
+    })
+    .getOne();
+  const workItemRepository = AppDataSource.getRepository(WorkItem);
+  const workItem = await workItemRepository.findOne({
+    where: { id: workItemId, organizationId: user?.organizationId, projectId: project?.id },
+  });
+  if (!user || !workItem) {
+    throw new AppError("Work item not found.", 404, "WORK_ITEM_NOT_FOUND");
+  }
+
+  Object.assign(workItem, {
+    ...req.body,
+    dueDate: req.body.dueDate == null ? req.body.dueDate : new Date(req.body.dueDate),
+  });
+  const saved = await workItemRepository.save(workItem);
+  res.json({ success: true, data: saved });
+};
+
+export const deleteWorkItem = async (req: Request, res: Response) => {
+  const userId = req.user?.id;
+  const workItemId = req.params.workItemId;
+  if (!userId || typeof workItemId !== "string") {
+    throw new AppError("Invalid work item request.", 400, "INVALID_WORK_ITEM_ID");
+  }
+
+  const user = await AppDataSource.getRepository(User).findOne({
+    where: { id: userId },
+    select: { id: true, organizationId: true },
+  });
+  const project = await AppDataSource.getRepository(Project)
+    .createQueryBuilder("project")
+    .leftJoin("project.memberships", "membership", "membership.userId = :userId", { userId })
+    .where("project.id = (SELECT work_item.project_id FROM work_items work_item WHERE work_item.id = :workItemId)", { workItemId })
+    .andWhere("project.organizationId = :organizationId", { organizationId: user?.organizationId })
+    .andWhere("(project.visibility = :publicVisibility OR membership.userId = :userId)", {
+      publicVisibility: ProjectVisibility.PUBLIC,
+      userId,
+    })
+    .getOne();
+  const workItemRepository = AppDataSource.getRepository(WorkItem);
+  const workItem = await workItemRepository.findOne({
+    where: { id: workItemId, organizationId: user?.organizationId, projectId: project?.id },
+  });
+  if (!user || !workItem) {
+    throw new AppError("Work item not found.", 404, "WORK_ITEM_NOT_FOUND");
+  }
+
+  await workItemRepository.remove(workItem);
+  res.json({ success: true, data: { id: workItemId } });
+};

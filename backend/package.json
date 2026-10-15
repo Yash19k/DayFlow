@@ -6,8 +6,10 @@
   "type": "commonjs",
   "main": "server.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon --watch . --ext ts --exec ts-node server.ts"
+    "test": "node --test",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc",
+    "dev": "nodemon --exec \"ts-node --files server.ts\""
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
@@ -24,6 +26,8 @@
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^26.6.5",
