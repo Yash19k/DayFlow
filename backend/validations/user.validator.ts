@@ -43,3 +43,8 @@ export const onboardingSchema = Joi.object({
       .required(),
   }).required(),
 });
+
+export const loginSchema = Joi.object({
+  email: Joi.string().trim().lowercase().email().max(255).required(),
+  password: Joi.string().min(8).max(72).required(),
+});

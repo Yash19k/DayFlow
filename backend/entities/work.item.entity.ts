@@ -14,6 +14,7 @@ import { Project } from "./project.entity";
 import { User } from "./user.entity";
 import { WorkItemAssignee } from "./work.item-assignee.entity";
 import { Sprint } from "./sprint.entities";
+import { WorkItemAttachment } from "./work.item.attachment.entity";
 
 
 export enum WorkItemType {
@@ -136,7 +137,6 @@ status: WorkItemStatus;
   @OneToMany(() => WorkItem, (workItem) => workItem.parentWorkItem)
   children: WorkItem[];
 
-  
   @OneToMany(
     () => WorkItemAssignee,
     (assignment) => assignment.workItem,
@@ -159,4 +159,10 @@ sprintId: string | null;
 )
 @JoinColumn({ name: "sprint_id" })
 sprint: Sprint | null;
+
+  @OneToMany(
+    () => WorkItemAttachment,
+    (attachment) => attachment.workItem,
+  )
+  attachments: WorkItemAttachment[];
 }

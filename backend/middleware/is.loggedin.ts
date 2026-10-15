@@ -3,6 +3,7 @@ import { Request, Response, NextFunction } from "express";
 import jwt, { JwtPayload } from "jsonwebtoken";
 import { User } from "../entities/user.entity";
 import { AppDataSource } from "../config/data.source";
+import { AppError } from "../errors/app.error";
 
 interface AuthTokenPayload extends JwtPayload {
   userId: string;
@@ -17,35 +18,21 @@ export const isLoggedIn = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const authorization = req.headers.authorization;
-    const bearerToken = authorization?.startsWith("Bearer ")
-      ? authorization.slice("Bearer ".length)
-      : undefined;
-    const token = bearerToken || req.cookies?.token;
+    const token = req.cookies?.token;
 
     if (!token || typeof token !== "string") {
-      res.status(401).json({
-        success: false,
-        message: "Authentication required. Please log in.",
-      });
-      return;
+      throw new AppError("Authentication required. Please log in.", 401, "UNAUTHORIZED");
     }
 
     // 2. Ensure the JWT secret is configured
     const secret = process.env.ACCESS_TOKEN_SECRET || process.env.JWT_SECRET;
 
     if (!secret) {
-      console.error("ACCESS_TOKEN_SECRET or JWT_SECRET is not configured.");
-
-      res.status(500).json({
-        success: false,
-        message: "Internal server error.",
-      });
-      return;
+      console.error("JWT_SECRET is not configured.");
+      throw new AppError("Internal server error.", 500, "INTERNAL_SERVER_ERROR");
     }
 
-    // 3. Verify the JWT signature and expiration
-    const decoded = jwt.verify(token, secret);
+    const decoded = jwt.verify(token, secret, { algorithms: ["HS256"] });
 
     if (
       typeof decoded === "string" ||
@@ -54,51 +41,34 @@ export const isLoggedIn = async (
       typeof decoded.role !== "string" ||
       decoded.type !== "ACCESS"
     ) {
-      res.status(401).json({
-        success: false,
-        message: "Invalid authentication token.",
-      });
-      return;
+      throw new AppError("Invalid authentication token.", 401, "INVALID_TOKEN");
     }
 
     const payload = decoded as AuthTokenPayload;
-    const user = await AppDataSource.getRepository(User).findOneBy({
-      id: payload.userId,
+    const userRepository = AppDataSource.getRepository(User);
+    const user = await userRepository.findOne({
+      where: { id: payload.userId },
+      select: { id: true, role: true, organizationId: true, status: true },
     });
 
     if (!user || user.status !== "ACTIVE") {
-      res.status(401).json({
-        success: false,
-        message: "Invalid authentication token.",
-      });
-      return;
+      throw new AppError("Invalid authentication token.", 401, "INVALID_TOKEN");
     }
 
     req.user = {
       id: user.id,
-      organizationId: user.organizationId ?? undefined,
-      email: user.email,
       role: user.role,
+      organizationId: user.organizationId,
     };
-
     next();
   } catch (error: unknown) {
     if (
       error instanceof jwt.JsonWebTokenError ||
       error instanceof jwt.TokenExpiredError
     ) {
-      res.status(401).json({
-        success: false,
-        message: "Invalid or expired authentication token.",
-      });
+      next(new AppError("Invalid or expired authentication token.", 401, "INVALID_TOKEN"));
       return;
     }
-
-    console.error("Authentication middleware error:", error);
-
-    res.status(500).json({
-      success: false,
-      message: "Internal server error.",
-    });
+    next(error);
   }
 };
