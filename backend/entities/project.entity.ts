@@ -17,10 +17,12 @@ import { User } from "./user.entity";
 import { WorkItem } from "./work.item.entity";
 import { ProjectMember } from "./project.member.entity";
 import { Sprint } from "./sprint.entities";
+
 export enum ProjectVisibility {
   PRIVATE = "PRIVATE",
   PUBLIC = "PUBLIC",
 }
+
 @Entity({ name: "projects" })
 @Unique("UQ_projects_organization_key", ["organizationId", "key"])
 @Index("IDX_projects_organization_id", ["organizationId"])
@@ -103,15 +105,19 @@ export class Project {
     (membership) => membership.project,
   )
   memberships: ProjectMember[];
+
 @Column({
   type: "enum",
   enum: ProjectVisibility,
   default: ProjectVisibility.PRIVATE,
 })
-visibility: ProjectVisibility;
+  visibility: ProjectVisibility;
+  
 @OneToMany(
   () => Sprint,
   (sprint) => sprint.project,
 )
-sprints: Sprint[];
+  sprints: Sprint[];
+  
+  
 }

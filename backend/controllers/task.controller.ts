@@ -58,7 +58,14 @@ export const createWorkItem =
           );
         }
 
-        
+        if (!user.organizationId) {
+          throw new AppError(
+            "You are not associated with an organization",
+            403,
+            "ORGANIZATION_NOT_FOUND"
+          );
+        }
+
         // 2. Check organization isolation and project visibility.
         const project = await projectRepository
           .createQueryBuilder("project")

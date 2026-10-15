@@ -29,12 +29,14 @@ export class ProjectMember {
     nullable: true,
   })
   addedById!: string | null;
+
   @Column({
   type: "enum",
   enum: ProjectRole,
   enumName: "project_members_role_enum",
   default: ProjectRole.MEMBER,
-})
+  })
+    
 role!: ProjectRole;
   @CreateDateColumn({ name: "joined_at" })
   joinedAt!: Date;
@@ -44,6 +46,7 @@ role!: ProjectRole;
     (project) => project.memberships,
     { onDelete: "CASCADE" },
   )
+    
   @JoinColumn({ name: "project_id" })
   project!: Project;
 
@@ -52,6 +55,7 @@ role!: ProjectRole;
     (user) => user.projectMemberships,
     { onDelete: "CASCADE" },
   )
+    
   @JoinColumn({ name: "user_id" })
   user!: User;
 

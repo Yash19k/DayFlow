@@ -37,8 +37,8 @@ export class User  {
   @PrimaryGeneratedColumn("uuid")
   id: string;
 
-  @Column({ name: "organization_id", type: "uuid" })
-  organizationId: string;
+  @Column({ name: "organization_id", type: "uuid", nullable: true })
+  organizationId: string | null;
 
   @Column({ name: "full_name", type: "varchar", length: 100 })
   fullName: string;
