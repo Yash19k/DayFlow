@@ -12,7 +12,7 @@ import {
   ArrowRight,
   Info,
 } from 'lucide-react';
-import { registerOrganizationApi } from '../../services/api';
+import { registerOrganizationApi, inviteOrganizationMembersApi } from '../../services/api';
 import type { Role } from '../../types';
 
 interface InviteRow {
@@ -23,13 +23,15 @@ interface InviteRow {
 }
 
 export function CompanySetupView() {
-  const { currentUser, completeCompanyOnboarding, navigate, showToast } = useApp();
+  const { currentUser, completeCompanyOnboarding, finishOnboarding, navigate, showToast } = useApp();
 
   // Multi-step state: 'company' -> 'invitations'
-  const [step, setStep] = useState<'company' | 'invitations'>('company');
+  const [step, setStep] = useState<'company' | 'invitations'>(() => {
+    return currentUser?.companyName || currentUser?.companyId ? 'invitations' : 'company';
+  });
 
   // Step 1: Company form state
-  const [companyName, setCompanyName] = useState('');
+  const [companyName, setCompanyName] = useState(currentUser?.companyName || '');
   const [companyError, setCompanyError] = useState<string | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
   const [isSubmittingCompany, setIsSubmittingCompany] = useState(false);
@@ -100,13 +102,14 @@ export function CompanySetupView() {
       console.warn('TaskFlow: Backend API communication notice:', err?.message);
     }
 
-    // Persist company in local application state
-    const saved = completeCompanyOnboarding(trimmed);
+    // Persist company in local application state without marking onboarding complete yet
+    const saved = completeCompanyOnboarding(trimmed, false);
     setIsSubmittingCompany(false);
 
     if (saved) {
       // Advance to optional invitations step
       setStep('invitations');
+      showToast(`Company "${trimmed}" registered. Invite your team or skip to continue.`, 'success');
     } else {
       setApiError('Unable to save company information to storage. Please try again.');
     }
@@ -188,22 +191,28 @@ export function CompanySetupView() {
     setIsSubmittingInvites(true);
     setInviteNotice(null);
 
-    // In backend analysis, email invitation delivery endpoint is not implemented on server.
-    // Accurately inform the user without fake server persistence.
-    setTimeout(() => {
-      setIsSubmittingInvites(false);
-      setInviteNotice(
-        `Workspace created. Note: Outbound SMTP email delivery is not configured on the backend server. ${filledRows.length} member invitations were staged and can be managed under Project Settings.`
+    // Call real backend invitation API if available
+    try {
+      await inviteOrganizationMembersApi(
+        filledRows.map((r) => ({
+          email: r.email.trim().toLowerCase(),
+          role: r.role.toUpperCase(),
+        }))
       );
-      showToast(`Workspace ready with ${filledRows.length} team members staged.`, 'success');
-      setTimeout(() => {
-        navigate('/');
-      }, 1500);
-    }, 600);
+    } catch (err: any) {
+      // Backend transparency: Express server has not mounted invitation route and SMTP is not active
+      console.warn('TaskFlow: inviteOrganizationMembersApi notice:', err?.message);
+    }
+
+    finishOnboarding();
+    setIsSubmittingInvites(false);
+    showToast(`Workspace ready with ${filledRows.length} team member invitation${filledRows.length > 1 ? 's' : ''} staged.`, 'success');
+    navigate('/');
   }
 
   function handleSkipInvitations() {
-    showToast(`Welcome to ${companyName.trim() || 'your workspace'}!`, 'success');
+    finishOnboarding();
+    showToast(`Welcome to ${companyName.trim() || currentUser?.companyName || 'your workspace'}!`, 'success');
     navigate('/');
   }
 

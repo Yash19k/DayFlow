@@ -173,3 +173,21 @@ export async function getProjectWorkItemsApi(
     }
   );
 }
+
+/**
+ * Invite organization members (POST /api/organization/members/invite)
+ */
+export interface InviteMemberApiInput {
+  email: string;
+  role: string;
+}
+
+export async function inviteOrganizationMembersApi(
+  members: InviteMemberApiInput[]
+): Promise<any> {
+  return request<any>('/api/organization/members/invite', {
+    method: 'POST',
+    body: JSON.stringify(members),
+  });
+}
+

@@ -71,10 +71,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (match) {
         setCurrentProjectId(match[1]);
         if (match[2]) {
-          setProjectTab(match[2]);
+          const rawTab = match[2].split(/[#?]/)[0];
+          const hashSection = match[2].includes('#') ? match[2].split('#')[1] : null;
+          if (rawTab === 'settings' && hashSection === 'members') {
+            setProjectTab('members');
+          } else {
+            setProjectTab(rawTab);
+          }
         }
       }
     }
+
+    // Run on initial mount to sync direct links and browser refresh
+    handleHashChange();
+
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
@@ -1147,7 +1157,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return newUser;
   }, []);
 
-  const completeCompanyOnboarding = useCallback((companyName: string): boolean => {
+  const completeCompanyOnboarding = useCallback((companyName: string, markComplete = true): boolean => {
     const trimmed = companyName.trim();
     if (!trimmed) return false;
 
@@ -1163,7 +1173,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ...currentUser,
         companyId: newCompany.id,
         companyName: newCompany.name,
-        onboardingCompleted: true,
+        onboardingCompleted: markComplete,
       };
 
       setCurrentCompany(newCompany);
@@ -1177,6 +1187,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return false;
     }
   }, [currentUser, recordAudit]);
+
+  const finishOnboarding = useCallback(() => {
+    setCurrentUser((prev) => {
+      const updated = {
+        ...prev,
+        onboardingCompleted: true,
+      };
+      saveStateToStorage('CURRENT_USER', updated);
+      return updated;
+    });
+  }, []);
 
   // Sprint operations
   const createSprint = useCallback(async (sprintData: Partial<Sprint>) => {
@@ -1274,6 +1295,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     currentCompany,
     registerUser,
     completeCompanyOnboarding,
+    finishOnboarding,
     switchUser,
     projects,
     createProject,
