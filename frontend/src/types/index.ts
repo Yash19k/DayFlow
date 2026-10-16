@@ -343,6 +343,9 @@ export interface AppContextValue {
   projectLabels: Label[];
   createLabel: (labelData: Partial<Label>) => Label;
   deleteLabel: (labelId: string) => void;
+  login?: (email: string, password: string) => Promise<boolean>;
+  logout?: () => Promise<void>;
+  isLoadingBackend?: boolean;
   [key: string]: any;
 }
 
